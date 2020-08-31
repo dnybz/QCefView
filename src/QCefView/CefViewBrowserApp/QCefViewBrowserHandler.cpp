@@ -317,7 +317,7 @@ QCefViewBrowserHandler::OnLoadEnd(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFr
 {
   CEF_REQUIRE_UI_THREAD();
   if (pQCefWindow_)
-    pQCefWindow_->loadEnd(httpStatusCode);
+    pQCefWindow_->loadEnd(browser->GetIdentifier(), (int)frame->GetIdentifier(), QString::fromStdString(frame->GetURL().ToString()), httpStatusCode);
 }
 
 void

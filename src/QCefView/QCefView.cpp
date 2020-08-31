@@ -248,6 +248,50 @@ public:
       pQCefViewHandler_->SetKeyboardHandler(handler);
   }
 
+  void executeJavaScript(const QString& code) {
+	  if (pQCefViewHandler_) {
+		  CefString javaScript = code.toStdString();
+		  std::vector<int64> identifiers;
+		  pQCefViewHandler_->GetBrowser()->GetFrameIdentifiers(identifiers);
+		  for (auto &it : identifiers) {
+			  CefRefPtr<CefFrame> frame = pQCefViewHandler_->GetBrowser()->GetFrame(it);
+			  frame->ExecuteJavaScript(javaScript, frame->GetURL(), 0);
+		  }
+	  }
+  }
+
+  void executeFrameJavaScript(const QString& code, int frame) {
+	  if (pQCefViewHandler_) {
+		  CefString javaScript = code.toStdString();
+		  std::vector<int64_t> identifiers;
+		  pQCefViewHandler_->GetBrowser()->GetFrameIdentifiers(identifiers);
+		  for (auto &it : identifiers) {
+			  if (frame == (int)it) {
+				  CefRefPtr<CefFrame> frame = pQCefViewHandler_->GetBrowser()->GetFrame(it);
+				  frame->ExecuteJavaScript(javaScript, frame->GetURL(), 0);
+			  }
+		  }
+	  }
+  }
+
+  void injectJavaScript(const QString & url)
+  {
+	  if (pQCefViewHandler_) {
+
+		  QString javaScript = QString(R"(
+										var jscript = document.createElement('script');
+										jscript.src = '%1';
+										document.body.appendChild(jscript);
+										)").arg(url);
+		  std::vector<int64> identifiers;
+		  pQCefViewHandler_->GetBrowser()->GetFrameIdentifiers(identifiers);
+		  for (auto &it : identifiers) {
+			  CefRefPtr<CefFrame> frame = pQCefViewHandler_->GetBrowser()->GetFrame(it);
+			  frame->ExecuteJavaScript(CefString(javaScript.toStdWString()), frame->GetURL(), 0);
+		  }
+	  }
+  }
+
 private:
   /// <summary>
   ///
@@ -279,7 +323,7 @@ QCefView::QCefView(const QString url, QWidget* parent /*= 0*/)
 
   connect(pImpl_->cefWindow(), SIGNAL(loadStart()), this, SLOT(onLoadStart()));
 
-  connect(pImpl_->cefWindow(), SIGNAL(loadEnd(int)), this, SLOT(onLoadEnd(int)));
+  connect(pImpl_->cefWindow(), SIGNAL(loadEnd(int , int, const QString&, int)), this, SLOT(onLoadEnd(int , int, const QString&, int)));
 
   connect(pImpl_->cefWindow(),
           SIGNAL(loadError(int, const QString&, const QString&)),
@@ -324,6 +368,25 @@ QCefView::getCefWinId()
     return pImpl_->getCefWinId();
 
   return 0;
+}
+
+void 
+QCefView::executeJavaScript(const QString& code)
+{
+	if (pImpl_)
+		return pImpl_->executeJavaScript(code);
+}
+
+void QCefView::executeFrameJavaScript(const QString & code, int frame)
+{
+	if (pImpl_)
+		return pImpl_->executeFrameJavaScript(code, frame);
+}
+
+void QCefView::injectJavaScript(const QString & url)
+{
+	if (pImpl_)
+		return pImpl_->injectJavaScript(url);
 }
 
 void
@@ -505,7 +568,7 @@ QCefView::onLoadStart()
 {}
 
 void
-QCefView::onLoadEnd(int httpStatusCode)
+QCefView::onLoadEnd(int browserId, int frameId, const QString& frameUrl, int httpStatusCode)
 {}
 
 void

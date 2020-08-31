@@ -74,7 +74,7 @@ signals:
   ///
   /// </summary>
   /// <param name="httpStatusCode"></param>
-  void loadEnd(int httpStatusCode);
+  void loadEnd(int browserId, int frameId, const QString& frameUrl, int httpStatusCode);
 
   /// <summary>
   ///

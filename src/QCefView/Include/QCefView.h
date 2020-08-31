@@ -88,6 +88,28 @@ public:
   WId getCefWinId();
 
   /// <summary>
+  ///
+  /// </summary>
+  /// <returns></returns>
+  /// <param name="javascript code"></param>
+  void executeJavaScript(const QString& code);
+
+  /// <summary>
+  ///
+  /// </summary>
+  /// <returns></returns>
+  /// <param name="javascript code"></param>
+  /// <param name="frame"></param>
+  void executeFrameJavaScript(const QString& code, int frame);
+
+  /// <summary>
+  ///
+  /// </summary>
+  /// <returns></returns>
+  /// <param name="javascript url"></param>
+  void injectJavaScript(const QString& url);
+
+  /// <summary>
   /// Navigates to the content.
   /// </summary>
   /// <param name="content"></param>
@@ -240,7 +262,7 @@ protected slots:
   ///
   /// </summary>
   /// <param name="httpStatusCode"></param>
-  virtual void onLoadEnd(int httpStatusCode);
+  virtual void onLoadEnd(int browserId, int frameId, const QString& frameUrl, int httpStatusCode);
 
   /// <summary>
   ///

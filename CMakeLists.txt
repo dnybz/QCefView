@@ -112,4 +112,5 @@ add_subdirectory(src/QCefView)
 # Add demo
 ###############################################################
 add_subdirectory(test/QCefViewTest)
+add_subdirectory(test/SimpleBrowser)
 ###############################################################
