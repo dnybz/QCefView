@@ -84,6 +84,30 @@ public:
   /// <summary>
   ///
   /// </summary>
+  /// <param name="path"></param>
+  /// <param name="url"></param>
+  static void addLocalFolderResource(const QString& path, const QString& url, int priority = 0);
+
+  /// <summary>
+  ///
+  /// </summary>
+  /// <param name="path"></param>
+  /// <param name="url"></param>
+  /// <param name="password"></param>
+  static void addArchiveResource(const QString& path, const QString& url, const QString& password = "");
+
+  /// <summary>
+  ///
+  /// </summary>
+  /// <param name="name"></param>
+  /// <param name="value"></param>
+  /// <param name="domain"></param>
+  /// <param name="url"></param>
+  static void addCookie(const QString& name, const QString& value, const QString& domain, const QString& url);
+
+  /// <summary>
+  ///
+  /// </summary>
   /// <returns></returns>
   WId getCefWinId();
 
@@ -113,8 +137,7 @@ public:
   /// Navigates to the content.
   /// </summary>
   /// <param name="content"></param>
-  /// <param name="url"></param>
-  void navigateToString(const QString& content, const QString& url);
+  void navigateToString(const QString& content);
 
   /// <summary>
   ///
@@ -270,7 +293,27 @@ protected slots:
   /// <param name="errorCode"></param>
   /// <param name="errorMsg"></param>
   /// <param name="failedUrl"></param>
-  virtual void onLoadError(int errorCode, const QString& errorMsg, const QString& failedUrl);
+  /// <param name="handled"></param>
+  virtual void onLoadError(int errorCode, const QString& errorMsg, const QString& failedUrl, bool& handled);
+
+  /// <summary>
+  ///
+  /// </summary>
+  /// <param name="region"></param>
+  virtual void onDraggableRegionChanged(const QRegion& region);
+
+  /// <summary>
+  ///
+  /// </summary>
+  /// <param name="message"></param>
+  /// <param name="level"></param>
+  virtual void onConsoleMessage(const QString& message, int level);
+
+  /// <summary>
+  ///
+  /// </summary>
+  /// <param name="next"></param>
+  virtual void onTakeFocus(bool next);
 
   /// <summary>
   ///

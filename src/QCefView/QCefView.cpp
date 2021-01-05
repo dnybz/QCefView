@@ -9,6 +9,7 @@
 #include <include/cef_app.h>
 #include <include/cef_browser.h>
 #include <include/cef_frame.h>
+#include <include/cef_parser.h>
 #include <include/cef_sandbox_win.h>
 #pragma endregion cef_headers
 
@@ -17,6 +18,7 @@
 #include "Include/QCefQuery.h"
 #include "Include/QCefView.h"
 #include "Include/QCefEvent.h"
+#include "CCefManager.h"
 #include "CCefWindow.h"
 #include "CefViewBrowserApp/QCefViewBrowserHandler.h"
 
@@ -37,11 +39,30 @@ public:
     RECT rc = { 0 };
     window_info.SetAsChild((HWND)pCefWindow_->winId(), rc);
 
+    for (auto cookieItem : cookieItemList_) {
+      CCefManager::getInstance().addCookie(cookieItem.name.toStdString(),
+                                           cookieItem.value.toStdString(),
+                                           cookieItem.domain.toStdString(),
+                                           cookieItem.url.toStdString());
+    }
+
     CefBrowserSettings browserSettings;
     browserSettings.plugins = STATE_DISABLED; // disable all plugins
 
     // Create the browser
     pQCefViewHandler_ = new QCefViewBrowserHandler(pCefWindow_);
+
+    // add archive mapping
+    for (auto archiveMapping : archiveMappingList_) {
+      pQCefViewHandler_->AddArchiveResourceProvider(
+        archiveMapping.path.toStdString(), archiveMapping.url.toStdString(), archiveMapping.psw.toStdString());
+    }
+
+    // add local folder mapping
+    for (auto folderMapping : folderMappingList_) {
+      pQCefViewHandler_->AddLocalDirectoryResourceProvider(
+        folderMapping.path.toStdString(), folderMapping.url.toStdString(), folderMapping.priority);
+    }
 
     // Create the main browser window.
     if (!CefBrowserHost::CreateBrowser(window_info,       // window info
@@ -57,13 +78,17 @@ public:
   ~Implementation()
   {
     if (pQCefViewHandler_) {
-      // Wait for all browser to close
       pQCefViewHandler_->CloseAllBrowsers(true);
       pQCefViewHandler_ = nullptr;
     }
   }
 
-  void closeAllBrowsers() {}
+  void closeAllBrowsers()
+  {
+    if (pQCefViewHandler_) {
+      pQCefViewHandler_->CloseAllBrowsers(true);
+    }
+  }
 
   CCefWindow* cefWindow() { return pCefWindow_; }
 
@@ -75,14 +100,27 @@ public:
     return 0;
   }
 
-  void navigateToString(const QString& content, const QString& url)
+  void addLocalFolderResource(const QString& path, const QString& url)
   {
     if (pQCefViewHandler_) {
-      CefString strContent;
-      strContent.FromString(content.toStdString());
-      CefString strUrl;
-      strUrl.FromString(url.toStdString());
-      pQCefViewHandler_->GetBrowser()->GetMainFrame()->LoadString(strContent, strUrl);
+      pQCefViewHandler_->AddLocalDirectoryResourceProvider(path.toStdString(), url.toStdString());
+    }
+  }
+
+  void addArchiveResource(const QString& path, const QString& url, const QString& password)
+  {
+    if (pQCefViewHandler_) {
+      pQCefViewHandler_->AddArchiveResourceProvider(path.toStdString(), url.toStdString(), password.toStdString());
+    }
+  }
+
+  void navigateToString(const QString& content)
+  {
+    if (pQCefViewHandler_) {
+      std::string data = content.toStdString();
+      data = CefURIEncode(CefBase64Encode(data.c_str(), data.size()), false).ToString();
+      data = "data:text/html;base64," + data;
+      pQCefViewHandler_->GetBrowser()->GetMainFrame()->LoadURL(data);
     }
   }
 
@@ -292,6 +330,38 @@ public:
 	  }
   }
 
+public:
+	  /// <summary>
+	  ///
+	  /// </summary>
+	  typedef struct FolderMapping
+	  {
+		  QString path;
+		  QString url;
+		  int priority;
+	  } FolderMapping;
+	  static QList<FolderMapping> folderMappingList_;
+
+	  /// <summary>
+	  ///
+	  /// </summary>
+	  typedef struct ArchiveMapping
+	  {
+		  QString path;
+		  QString url;
+		  QString psw;
+	  } ArchiveMapping;
+	  static QList<ArchiveMapping> archiveMappingList_;
+
+	  typedef struct CookieItem
+	  {
+		  QString name;
+		  QString value;
+		  QString domain;
+		  QString url;
+	  } CookieItem;
+	  static QList<CookieItem> cookieItemList_;
+
 private:
   /// <summary>
   ///
@@ -303,6 +373,10 @@ private:
   /// </summary>
   CefRefPtr<QCefViewBrowserHandler> pQCefViewHandler_;
 };
+
+QList<QCefView::Implementation::FolderMapping> QCefView::Implementation::folderMappingList_;
+QList<QCefView::Implementation::ArchiveMapping> QCefView::Implementation::archiveMappingList_;
+QList<QCefView::Implementation::CookieItem> QCefView::Implementation::cookieItemList_;
 
 QCefView::QCefView(const QString url, QWidget* parent /*= 0*/)
   : QWidget(parent)
@@ -316,31 +390,37 @@ QCefView::QCefView(const QString url, QWidget* parent /*= 0*/)
   layout->addWidget(windowContainer);
   setLayout(layout);
 
-  connect(pImpl_->cefWindow(),
-          SIGNAL(loadingStateChanged(bool, bool, bool)),
-          this,
-          SLOT(onLoadingStateChanged(bool, bool, bool)));
+  /* clang-format off */
+  connect(pImpl_->cefWindow(), SIGNAL(loadingStateChanged(bool, bool, bool)),
+      this, SLOT(onLoadingStateChanged(bool, bool, bool)));
 
-  connect(pImpl_->cefWindow(), SIGNAL(loadStart()), this, SLOT(onLoadStart()));
+  connect(pImpl_->cefWindow(), SIGNAL(loadStart()), 
+      this, SLOT(onLoadStart()));
 
-  connect(pImpl_->cefWindow(), SIGNAL(loadEnd(int , int, const QString&, int)), this, SLOT(onLoadEnd(int , int, const QString&, int)));
+  connect(pImpl_->cefWindow(), SIGNAL(loadEnd(int, int, const QString&, int)), 
+	  this, SLOT(onLoadEnd(int, int, const QString&, int)));
 
-  connect(pImpl_->cefWindow(),
-          SIGNAL(loadError(int, const QString&, const QString&)),
-          this,
-          SLOT(onLoadError(int, const QString&, const QString&)));
+  connect(pImpl_->cefWindow(), SIGNAL(loadError(int, const QString&, const QString&, bool&)),
+      this, SLOT(onLoadError(int, const QString&, const QString&, bool&)));
 
-  connect(pImpl_->cefWindow(), SIGNAL(processUrlRequest(const QString&)), this, SLOT(onQCefUrlRequest(const QString&)));
+  connect(pImpl_->cefWindow(), SIGNAL(draggableRegionChanged(const QRegion&)),
+      this, SLOT(onDraggableRegionChanged(const QRegion&)));
 
-  connect(pImpl_->cefWindow(),
-          SIGNAL(processQueryRequest(const QCefQuery&)),
-          this,
-          SLOT(onQCefQueryRequest(const QCefQuery&)));
+  connect(pImpl_->cefWindow(), SIGNAL(consoleMessage(const QString&, int)),
+      this, SLOT(onConsoleMessage(const QString&, int)));
 
-  connect(pImpl_->cefWindow(),
-          SIGNAL(invokeMethodNotify(int, int, const QString&, const QVariantList&)),
-          this,
-          SLOT(onInvokeMethodNotify(int, int, const QString&, const QVariantList&)));
+  connect(pImpl_->cefWindow(), SIGNAL(takeFocus(bool)), 
+      this, SLOT(onTakeFocus(bool)));
+
+  connect(pImpl_->cefWindow(), SIGNAL(processUrlRequest(const QString&)), 
+      this, SLOT(onQCefUrlRequest(const QString&)));
+
+  connect(pImpl_->cefWindow(), SIGNAL(processQueryRequest(const QCefQuery&)),
+      this, SLOT(onQCefQueryRequest(const QCefQuery&)));
+
+  connect(pImpl_->cefWindow(), SIGNAL(invokeMethodNotify(int, int, const QString&, const QVariantList&)),
+      this, SLOT(onInvokeMethodNotify(int, int, const QString&, const QVariantList&)));
+  /* clang-format on */
 
   // If we're already part of a window, we'll install our event handler
   // If our parent changes later, this will be handled in QCefView::changeEvent()
@@ -354,11 +434,28 @@ QCefView::QCefView(QWidget* parent /*= 0*/)
 
 QCefView::~QCefView()
 {
-  if (pImpl_) {
-    pImpl_ = nullptr;
-  }
-
   disconnect();
+
+  if (pImpl_)
+    pImpl_.reset();
+}
+
+void
+QCefView::addLocalFolderResource(const QString& path, const QString& url, int priority /* = 0*/)
+{
+  Implementation::folderMappingList_.push_back({ path, url, priority });
+}
+
+void
+QCefView::addArchiveResource(const QString& path, const QString& url, const QString& password /* = ""*/)
+{
+  Implementation::archiveMappingList_.push_back({ password, url, password });
+}
+
+void
+QCefView::addCookie(const QString& name, const QString& value, const QString& domain, const QString& url)
+{
+  Implementation::cookieItemList_.push_back({ name, value, domain, url });
 }
 
 WId
@@ -390,10 +487,10 @@ void QCefView::injectJavaScript(const QString & url)
 }
 
 void
-QCefView::navigateToString(const QString& content, const QString& url)
+QCefView::navigateToString(const QString& content)
 {
   if (pImpl_)
-    pImpl_->navigateToString(content, url);
+    pImpl_->navigateToString(content);
 }
 
 void
@@ -572,7 +669,19 @@ QCefView::onLoadEnd(int browserId, int frameId, const QString& frameUrl, int htt
 {}
 
 void
-QCefView::onLoadError(int errorCode, const QString& errorMsg, const QString& failedUrl)
+QCefView::onLoadError(int errorCode, const QString& errorMsg, const QString& failedUrl, bool& handled)
+{}
+
+void
+QCefView::onDraggableRegionChanged(const QRegion& region)
+{}
+
+void
+QCefView::onConsoleMessage(const QString& message, int level)
+{}
+
+void
+QCefView::onTakeFocus(bool next)
 {}
 
 void
